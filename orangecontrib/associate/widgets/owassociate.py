@@ -31,6 +31,7 @@ class OWAssociate(widget.OWWidget):
 
     class Outputs:
         matching_data = Output("Matching Data", Table)
+        rules = Output("Association Rules", object)
 
     class Error(widget.OWWidget.Error):
         need_discrete_data = widget.Msg("Need some discrete data to work with.")
@@ -57,6 +58,7 @@ class OWAssociate(widget.OWWidget):
     def __init__(self):
         self.data = None
         self.output = None
+        self.rules = []
         self.onehot_mapping = {}
         self._is_running = False
         self._antecedentMatch = self._consequentMatch = lambda x: True
@@ -199,6 +201,7 @@ class OWAssociate(widget.OWWidget):
 
     def commit(self):
         self.Outputs.matching_data.send(self.output)
+        self.Outputs.rules.send(self.rules)
 
     def isSizeMatch(self, antecedentSize, consequentSize):
         return (self.filterAntecedentMin <= antecedentSize <= self.filterAntecedentMax and
@@ -315,6 +318,7 @@ class OWAssociate(widget.OWWidget):
         # Find itemsets
         nRules = 0
         itemsets = {}
+        self.rules = []
         ARROW_ITEM = StandardItem('→')
         ARROW_ITEM.setTextAlignment(Qt.AlignCenter)
         with self.progressBar(self.maxRules + 1) as progress:
@@ -341,11 +345,14 @@ class OWAssociate(widget.OWWidget):
                         continue
                     if filterSearch and not isSizeMatch(len(left), len(right)):
                         continue
-                    left_str =  ', '.join(names[i] for i in sorted(left))
-                    right_str = ', '.join(names[i] for i in sorted(right))
+                    left_names  = [ names[i] for i in sorted(left) ]
+                    right_names = [ names[i] for i in sorted(right) ]
+                    left_str =  ', '.join(left_names)
+                    right_str = ', '.join(right_names)
                     if filterSearch and not isRegexMatch(left_str, right_str):
                         continue
 
+                    self.rules.append((left_names, right_names, (support / n_examples), confidence))
                     # All filters matched, calculate stats and add table row
                     _, _, _, _, coverage, strength, lift, leverage = next(
                         rules_stats((rule,), itemsets, n_examples))
@@ -397,6 +404,7 @@ class OWAssociate(widget.OWWidget):
         self.nSelectedRules = 0
         self.nSelectedExamples = 0
         self._is_running = False
+        self.Outputs.rules.send(self.rules)
 
         #~ self.scatter_agg = scatter_agg
         #~ self.scatter_button.setDisabled(not nRules)
